@@ -34,17 +34,12 @@
 body { background: var(--bg); color: var(--text); font-family: var(--body); line-height: 1.55; -webkit-font-smoothing: antialiased; }
 button, input, textarea, select { font-family: inherit; color: inherit; }
 
-/* ---------- GATE SCREEN ---------- */
+/* ---------- GATE SCREEN (brief "loading" state while /whoami resolves) ---------- */
 .gate-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
 .gate-card { width: 100%; max-width: 340px; text-align: center; }
 .gate-card .eyebrow { justify-content: center; }
 .gate-card .wordmark { font-family: var(--display); font-weight: 900; font-size: 36px; letter-spacing: -0.02em; }
 .gate-copy { color: var(--muted); font-size: 14px; margin-top: 14px; }
-#gatePasswordInput { width: 100%; margin-top: 22px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 14.5px; text-align: center; }
-#gatePasswordInput:focus { outline: none; border-color: var(--accent); }
-.gate-submit { width: 100%; margin-top: 12px; background: var(--accent); color: #171310; border: none; font-family: var(--display); font-weight: 700; font-size: 14px; padding: 12px 20px; border-radius: 10px; cursor: pointer; }
-.gate-submit:hover { filter: brightness(1.06); }
-.gate-error { color: var(--warn); font-size: 13px; margin-top: 12px; }
 
 /* ---------- APP LAYOUT ---------- */
 .app { display: flex; min-height: 100vh; }
@@ -322,10 +317,7 @@ button, input, textarea, select { font-family: inherit; color: inherit; }
     <div class="gate-card">
       <div class="eyebrow">The Program</div>
       <div class="wordmark">REFINE</div>
-      <p class="gate-copy">Enter the course password to continue.</p>
-      <input type="text" id="gatePasswordInput" placeholder="Password" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore />
-      <button class="gate-submit" id="gateSubmit">Enter</button>
-      <div class="gate-error" id="gateError" hidden>Incorrect password.</div>
+      <p class="gate-copy">Loading…</p>
     </div>
   </div>
 
@@ -2106,15 +2098,12 @@ const DEFAULT_QUIZZES = {
 };
 
 /* =======================================================================
-   ACCESS CONTROL — a simple shared password gate, not real accounts.
-   These are plain text in the page source (anyone who views source can
-   read them) — this deters casual visitors, it is not real security.
-   CHANGE THESE two values before sharing the link with anyone.
+   ACCESS CONTROL — real auth now happens server-side (Cloudflare Pages
+   Functions: /login, /logout, /whoami, and _middleware.js which blocks
+   this whole page from being served without a valid session cookie).
+   See the "GATE" section below — it just asks the server who's logged
+   in and reflects that; it holds no secrets.
 ======================================================================= */
-const ACCESS_PASSWORDS = {
-  student: "J0yQXZr9vE",   // gets normal course access
-  editor: "UmN0GOws7c", // gets course access + the Content Editor
-};
 
 /* =======================================================================
    EDITABLE CONTENT — COURSE and QUIZZES start as deep copies of the
@@ -3425,11 +3414,9 @@ document.getElementById("aboutLink").addEventListener("click", () => { aboutOpen
 document.getElementById("lockLink").addEventListener("click", () => {
   state.access = { unlocked: false, role: null };
   saveState();
-  document.getElementById("gatePasswordInput").value = "";
-  document.getElementById("gateError").hidden = true;
-  document.getElementById("appRoot").style.display = "none";
-  document.getElementById("gateScreen").style.display = "";
-  document.getElementById("gatePasswordInput").focus();
+  fetch("/logout", { method: "POST" }).finally(() => {
+    location.href = "/login.html";
+  });
 });
 
 mainEl.addEventListener("click", (e) => {
@@ -3859,9 +3846,13 @@ document.addEventListener("keydown", (e) => {
 });
 
 /* =======================================================================
-   GATE — a simple shared password unlocks the app. See ACCESS_PASSWORDS
-   above; this is a deterrent, not real security (the passwords live in
-   this file's own source).
+   GATE — real auth lives server-side now (Cloudflare Pages Functions).
+   _middleware.js already refuses to serve this page at all without a
+   valid signed session cookie, so by the time this script runs the
+   visitor is guaranteed to be authenticated. We just ask the server
+   who they are via /whoami and reflect that role into the UI. If for
+   any reason no role comes back (e.g. this file was loaded from a
+   stale cache), send them to the login page as a safety net.
 ======================================================================= */
 function unlockApp(role) {
   state.access = { unlocked: true, role };
@@ -3871,23 +3862,19 @@ function unlockApp(role) {
   renderAll();
   loadPhotos();
 }
-function attemptUnlock() {
-  const val = document.getElementById("gatePasswordInput").value.trim();
-  if (val === ACCESS_PASSWORDS.editor) { unlockApp("admin"); return; }
-  if (val === ACCESS_PASSWORDS.student) { unlockApp("student"); return; }
-  document.getElementById("gateError").hidden = false;
-}
-document.getElementById("gateSubmit").addEventListener("click", attemptUnlock);
-document.getElementById("gatePasswordInput").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") attemptUnlock();
-});
 
-if (state.access && state.access.unlocked) {
-  unlockApp(state.access.role);
-} else {
-  document.getElementById("gateScreen").style.display = "";
-  document.getElementById("gatePasswordInput").focus();
-}
+fetch("/whoami")
+  .then((res) => res.json())
+  .then((data) => {
+    if (data && data.role) {
+      unlockApp(data.role);
+    } else {
+      location.href = "/login.html";
+    }
+  })
+  .catch(() => {
+    location.href = "/login.html";
+  });
 </script>
 </body>
 </html>

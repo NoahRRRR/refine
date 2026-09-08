@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>REFINE</title>
+<meta name="theme-color" content="#14161b">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #14161b; --card: #1b1e26; --line: rgba(255,255,255,0.09);
+    --text: #ECEAE3; --muted: #8b91a0; --accent: #CBA25E; --warn: #e0715c;
+    --display: "Archivo", system-ui, sans-serif; --body: "Inter", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--body); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; -webkit-font-smoothing: antialiased; }
+  .card { width: 100%; max-width: 340px; text-align: center; }
+  .eyebrow { font-family: var(--display); font-weight: 700; font-size: 11px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+  .wordmark { font-family: var(--display); font-weight: 900; font-size: 36px; letter-spacing: -0.02em; }
+  .copy { color: var(--muted); font-size: 14px; margin-top: 14px; }
+  input { width: 100%; margin-top: 22px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 14.5px; text-align: center; color: var(--text); font-family: inherit; }
+  input:focus { outline: none; border-color: var(--accent); }
+  button { width: 100%; margin-top: 12px; background: var(--accent); color: #171310; border: none; font-family: var(--display); font-weight: 700; font-size: 14px; padding: 12px 20px; border-radius: 10px; cursor: pointer; }
+  button:hover { filter: brightness(1.06); }
+  button:disabled { opacity: 0.6; cursor: default; }
+  .error { color: var(--warn); font-size: 13px; margin-top: 12px; min-height: 16px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="eyebrow">The Program</div>
+    <div class="wordmark">REFINE</div>
+    <p class="copy">Enter the course password to continue.</p>
+    <input type="text" id="passwordInput" placeholder="Password" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore />
+    <button id="submitBtn">Enter</button>
+    <div class="error" id="errorMsg"></div>
+  </div>
+<script>
+  const input = document.getElementById("passwordInput");
+  const btn = document.getElementById("submitBtn");
+  const errorMsg = document.getElementById("errorMsg");
+
+  async function attempt() {
+    const password = input.value.trim();
+    if (!password) return;
+    btn.disabled = true;
+    errorMsg.textContent = "";
+    try {
+      const res = await fetch("/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        location.href = "/refine-course.html";
+        return;
+      }
+      errorMsg.textContent = "Incorrect password.";
+    } catch (e) {
+      errorMsg.textContent = "Something went wrong — try again.";
+    }
+    btn.disabled = false;
+  }
+
+  btn.addEventListener("click", attempt);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") attempt(); });
+  input.focus();
+</script>
+</body>
+</html>
