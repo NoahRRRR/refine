@@ -166,6 +166,8 @@ button, input, textarea, select { font-family: inherit; color: inherit; }
 
 .modal-step { font-family: var(--display); font-weight: 700; font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
 .video-slot { margin-top: 20px; border: 1px dashed var(--line); border-radius: 12px; padding: 26px; text-align: center; color: var(--muted); font-size: 13px; }
+.video-embed { margin-top: 20px; position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; background: #000; }
+.video-embed iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: none; }
 .step-nav { margin-top: 26px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .back-link { color: var(--muted); font-size: 13px; cursor: pointer; }
 .back-link:hover { color: var(--text); }
@@ -370,8 +372,10 @@ button, input, textarea, select { font-family: inherit; color: inherit; }
    Hierarchy: categories -> levels -> lessons. Lesson fields follow the
    schema: title, estimatedMinutes, outcome, lessonCopy, todayAction,
    habitProtocol, checklist, reflectionPrompt, completionRule,
-   safetyNotice, resources. Only fields present in the source pack are
-   populated per lesson — nothing is fabricated to fill gaps.
+   safetyNotice, resources, videoId. Only fields present in the source
+   pack are populated per lesson — nothing is fabricated to fill gaps.
+   videoId is a Cloudflare Stream video UID, set later via the editor
+   once a lesson's video is recorded and uploaded to Stream.
 ======================================================================= */
 const DEFAULT_COURSE = [
   {
@@ -2661,7 +2665,9 @@ function renderLessonModal() {
       ${soberFlagHtml}
       ${safetyHtml}
       <div class="modal-copy">${renderCopy(lesson.lessonCopy)}</div>
-      <div class="video-slot">🎬 Explanatory video — coming soon</div>
+      ${lesson.videoId
+        ? `<div class="video-embed"><iframe src="https://iframe.videodelivery.net/${encodeURIComponent(lesson.videoId)}" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;" allowfullscreen loading="lazy"></iframe></div>`
+        : `<div class="video-slot">🎬 Explanatory video — coming soon</div>`}
       <div class="step-nav">
         <span></span>
         <button class="continue-btn" data-step="${quiz ? "quiz" : "cheatsheet"}">${quiz ? "Continue to quiz →" : "Continue to cheatsheet →"}</button>
@@ -3220,6 +3226,7 @@ function renderEditorLessonForm() {
     <div class="form-card">
       <div class="form-row"><label>Title</label><input type="text" data-editor-field="title" value="${escapeHtml(lesson.title)}"></div>
       <div class="form-row"><label>Estimated minutes (optional)</label><input type="number" data-editor-field="estimatedMinutes" value="${lesson.estimatedMinutes != null ? lesson.estimatedMinutes : ""}"></div>
+      <div class="form-row"><label>Cloudflare Stream video ID (optional)</label><input type="text" data-editor-field="videoId" value="${escapeHtml(lesson.videoId || "")}" placeholder="paste the video UID from the Stream dashboard"></div>
       <div class="form-row"><label>Outcome (optional)</label><input type="text" data-editor-field="outcome" value="${escapeHtml(lesson.outcome || "")}"></div>
       <div class="form-row"><label>Lesson copy</label><textarea data-editor-field="lessonCopy" style="min-height:180px;">${escapeHtml(lesson.lessonCopy || "")}</textarea></div>
       <div class="form-row"><label>Today's action (optional)</label><textarea data-editor-field="todayAction">${escapeHtml(lesson.todayAction || "")}</textarea></div>
@@ -3271,7 +3278,7 @@ function hasUnsavedEditorChanges() {
 
 function saveEditorLesson() {
   const { catIdx, lvlIdx, lessonIdx, lesson, quiz } = editorLessonDraft;
-  ["outcome", "todayAction", "completionRule", "reflectionPrompt", "safetyNotice"].forEach(k => { if (!lesson[k] || !lesson[k].trim()) delete lesson[k]; });
+  ["outcome", "todayAction", "completionRule", "reflectionPrompt", "safetyNotice", "videoId"].forEach(k => { if (!lesson[k] || !lesson[k].trim()) delete lesson[k]; });
   if (lesson.estimatedMinutes === "" || lesson.estimatedMinutes == null || isNaN(Number(lesson.estimatedMinutes))) delete lesson.estimatedMinutes;
   else lesson.estimatedMinutes = Number(lesson.estimatedMinutes);
   const cleanChecklist = (lesson.checklist || []).map(s => s.trim()).filter(Boolean);

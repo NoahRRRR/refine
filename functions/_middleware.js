@@ -9,6 +9,7 @@ const PUBLIC_PATHS = new Set([
   "/login",
   "/logout",
   "/whoami",
+  "/privacy.html",
   "/favicon.ico",
   "/IMG_3899.PNG",
   "/IMG_3988.JPG",
