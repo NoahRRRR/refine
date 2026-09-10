@@ -1,0 +1,16 @@
+{
+  "appId": "com.refine.app",
+  "appName": "REFINE",
+  "webDir": "www",
+  "server": {
+    "url": "https://refine-3jz.pages.dev",
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "StatusBar": {
+      "style": "DARK",
+      "overlaysWebView": false,
+      "backgroundColor": "#14161b"
+    }
+  }
+}
