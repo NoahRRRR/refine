@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>REFINE — The Complete Reset</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -33,7 +33,7 @@
   .btn-ghost:hover { border-color:var(--accent); }
 
   /* ===== NAV ===== */
-  nav { display:flex; justify-content:space-between; align-items:center; padding:24px 0; }
+  nav { display:flex; justify-content:space-between; align-items:center; padding:24px 0; padding-top:max(24px, env(safe-area-inset-top)); }
   .brand { font-family:var(--display); font-weight:900; font-size:22px; letter-spacing:-0.01em; }
 
   /* ===== HERO ===== */
