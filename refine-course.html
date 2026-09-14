@@ -305,7 +305,7 @@ button, input, textarea, select { font-family: inherit; color: inherit; }
 @media (max-width: 880px) {
   .app { flex-direction: column; }
   .sidebar { width: 100%; height: auto; position: relative; border-right: none; border-bottom: 1px solid var(--line); padding: 22px 18px; padding-top: max(22px, env(safe-area-inset-top)); }
-  .cat-nav { flex-direction: row; overflow-x: auto; gap: 8px; padding-bottom: 2px; }
+  .cat-nav { flex-direction: row; flex-wrap: wrap; gap: 8px; }
   .cat-item { flex-shrink: 0; white-space: nowrap; }
   .side-footer { display: none; }
   .main { padding: 28px 18px 70px; }
