@@ -73,6 +73,12 @@ button, input, textarea, select { font-family: inherit; color: inherit; }
 .about-link { display: inline-block; margin-top: 10px; color: var(--accent); cursor: pointer; font-weight: 600; }
 .about-link:hover { text-decoration: underline; }
 
+/* ---------- BOTTOM TABS (mobile only) ---------- */
+.bottom-tabs { display: none; }
+.bottom-tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; background: transparent; border: none; color: var(--muted); font-family: var(--body); font-size: 10.5px; font-weight: 600; padding: 7px 2px 5px; border-radius: 10px; cursor: pointer; }
+.bottom-tab .nav-icon { width: 21px; height: 21px; }
+.bottom-tab.active { color: var(--accent); }
+
 /* ---------- MAIN ---------- */
 .main { flex: 1; padding: 44px 44px 90px; max-width: 1080px; }
 .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); margin-bottom: 18px; cursor: pointer; }
@@ -308,9 +314,12 @@ button, input, textarea, select { font-family: inherit; color: inherit; }
   .cat-nav { flex-direction: row; flex-wrap: wrap; gap: 8px; }
   .cat-item { flex-shrink: 0; white-space: nowrap; }
   .side-footer { display: none; }
-  .main { padding: 28px 18px 70px; }
+  /* Replaced on mobile by the bottom tab bar. */
+  #homeNav, .nav-heading, #catNav, #toolNav { display: none; }
+  .main { padding: 28px 18px calc(88px + env(safe-area-inset-bottom)); }
   .tiles { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
   .entry-q { flex-direction: column; align-items: flex-start; }
+  .bottom-tabs { display: flex; position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); border-top: 1px solid var(--line); padding: 8px 6px calc(8px + env(safe-area-inset-bottom)); z-index: 40; }
 }
 </style>
 </head>
@@ -355,6 +364,8 @@ button, input, textarea, select { font-family: inherit; color: inherit; }
 
     <main class="main" id="main"></main>
   </div>
+
+  <nav class="bottom-tabs" id="bottomTabs"></nav>
 
   <div class="modal-backdrop" id="modalBackdrop">
     <div class="modal" id="modal"></div>
@@ -2294,6 +2305,11 @@ const ICON_PATHS = {
   flame: `<path d="M12 21.5c3.6 0 6-2.5 6-5.8 0-2.4-1.3-4-2.5-5.7.1 2-1 3-1.8 3 .2-3.5-1-5.9-3.2-7.9-.4 3.3-1.8 5-3.6 7.3-1.3 1.7-1.9 3.1-1.9 4.9 0 3.4 3 6.2 6 6.2 0 0 1.4 0 1-2.2-.3-1.5-1.4-1.9-2-2.6.4 0 2 .2 2 2.8z"/>`,
   camera: `<rect x="3" y="7.5" width="18" height="12.5" rx="2"/><path d="M8.5 7.5 10 5h4l1.5 2.5"/><circle cx="12" cy="13.5" r="3.4"/>`,
   pencil: `<path d="M4.5 19.5 5.3 16 15.6 5.7l3.4 3.4L8.7 19.4z"/><line x1="14" y1="7.3" x2="17.4" y2="10.7"/>`,
+  grid: `<rect x="3" y="3" width="8" height="8" rx="1.6"/><rect x="13" y="3" width="8" height="8" rx="1.6"/><rect x="3" y="13" width="8" height="8" rx="1.6"/><rect x="13" y="13" width="8" height="8" rx="1.6"/>`,
+  sliders: `<line x1="4" y1="6" x2="20" y2="6"/><circle cx="9" cy="6" r="2"/><line x1="4" y1="12" x2="20" y2="12"/><circle cx="15" cy="12" r="2"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="10" cy="18" r="2"/>`,
+  user: `<circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-4 3.2-6.5 7-6.5s7 2.5 7 6.5"/>`,
+  lock: `<rect x="5" y="11" width="14" height="9.5" rx="2"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11"/>`,
+  lock: `<rect x="5" y="11" width="14" height="9" rx="2.2"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11"/>`,
 };
 function iconSvg(name, size) {
   size = size || 15;
@@ -2365,6 +2381,7 @@ const navEl = document.getElementById("catNav");
 const toolNavEl = document.getElementById("toolNav");
 const homeNavEl = document.getElementById("homeNav");
 const mainEl = document.getElementById("main");
+const bottomTabsEl = document.getElementById("bottomTabs");
 const backdropEl = document.getElementById("modalBackdrop");
 const modalEl = document.getElementById("modal");
 const celebrationBackdropEl = document.getElementById("celebrationBackdrop");
@@ -2440,13 +2457,40 @@ function renderSidebar() {
   fillEl.style.width = (totalModules ? (totalDone / totalModules) * 100 : 0) + "%";
 }
 
+/* Mobile bottom tab bar — a compact, 5-icon alternative to the sidebar's
+   TRACKS/TOOLS lists. Tools' active state groups everything except
+   Progress, which gets its own tab since it's the daily-use one. */
+const BOTTOM_TABS = [
+  { tab: "home", icon: HOME_ICON, label: "Home" },
+  { tab: "tracks", icon: "grid", label: "Tracks" },
+  { tab: "tools", icon: "sliders", label: "Tools" },
+  { tab: "progress", icon: "trending", label: "Progress" },
+  { tab: "profile", icon: "user", label: "Profile" },
+];
+function currentBottomTab() {
+  if (activeTool === "overview") return "home";
+  if (activeTool === "progress") return "progress";
+  if (activeTool === "profile") return "profile";
+  if (activeTool === "tracks") return "tracks";
+  if (activeTool === "tools" || activeTool === "streaks" || activeTool === "photos" || activeTool === "editor") return "tools";
+  if (!activeTool && state.nav.catId) return "tracks";
+  return null;
+}
+function renderBottomTabs() {
+  const current = currentBottomTab();
+  bottomTabsEl.innerHTML = BOTTOM_TABS.map(t => `
+    <button class="bottom-tab${current === t.tab ? " active" : ""}" data-tab="${t.tab}" type="button">
+      ${iconSvg(t.icon, 21)}<span>${t.label}</span>
+    </button>`).join("");
+}
+
 /* =======================================================================
-   OVERVIEW — the landing dashboard: a snapshot of every stat, today's
-   status, and quick links into the tools. Everything else in the app is
-   one click away from here.
+   Shared markup fragments — used by the Overview dashboard and also by
+   the mobile bottom-tab "Tracks" / "Tools" list pages, so both stay in
+   sync automatically.
 ======================================================================= */
-function renderOverviewView() {
-  const trackCardsHtml = COURSE.map(cat => {
+function trackCardsHtml() {
+  return COURSE.map(cat => {
     const { totalLevels, completedLevels, currentLevel } = categoryLevelInfo(cat);
     const { total, done } = categoryLessonCounts(cat);
     const isComplete = completedLevels === totalLevels;
@@ -2462,16 +2506,25 @@ function renderOverviewView() {
         <div class="overview-track-sub">${done}/${total} lessons</div>
       </div>`;
   }).join("");
+}
 
-  const streak = computeStreak();
-  const today = state.checkins[todayKey()];
-  const checkinDone = !!today;
-
-  const toolLinksHtml = TOOLS.map(t => `
+function toolCardsHtml(list) {
+  return list.map(t => `
     <div class="overview-tool-card" data-overview-tool="${t.id}" role="button" tabindex="0">
       ${iconSvg(t.icon, 17)}
       <span>${t.label}</span>
     </div>`).join("");
+}
+
+/* =======================================================================
+   OVERVIEW — the landing dashboard: a snapshot of every stat, today's
+   status, and quick links into the tools. Everything else in the app is
+   one click away from here.
+======================================================================= */
+function renderOverviewView() {
+  const streak = computeStreak();
+  const today = state.checkins[todayKey()];
+  const checkinDone = !!today;
 
   mainEl.innerHTML = `
     <div class="main-head">
@@ -2495,10 +2548,56 @@ function renderOverviewView() {
     </div>
 
     <div class="section-label" style="margin-top:32px;">Your tracks</div>
-    <div class="overview-track-grid">${trackCardsHtml}</div>
+    <div class="overview-track-grid">${trackCardsHtml()}</div>
 
     <div class="section-label" style="margin-top:32px;">Tools</div>
-    <div class="overview-tool-row">${toolLinksHtml}</div>
+    <div class="overview-tool-row">${toolCardsHtml(TOOLS)}</div>
+  `;
+}
+
+/* =======================================================================
+   TRACKS LIST / TOOLS LIST / PROFILE — dedicated pages behind the mobile
+   bottom-tab bar's "Tracks", "Tools", and "Profile" icons. Reuses the
+   same track/tool card markup (and its click handling) as Overview.
+======================================================================= */
+function renderTracksListView() {
+  mainEl.innerHTML = `
+    <div class="main-head">
+      <div class="main-title">Tracks</div>
+      <div class="main-tag">Five tracks, run in parallel. Tap one to jump in.</div>
+    </div>
+    <div class="overview-track-grid">${trackCardsHtml()}</div>
+  `;
+}
+
+function renderToolsListView() {
+  const visibleTools = state.access.role === "admin" ? TOOLS.concat(ADMIN_TOOLS) : TOOLS;
+  mainEl.innerHTML = `
+    <div class="main-head">
+      <div class="main-title">Tools</div>
+      <div class="main-tag">Streaks, photos, and everything else that isn't a lesson.</div>
+    </div>
+    <div class="overview-tool-row">${toolCardsHtml(visibleTools)}</div>
+  `;
+}
+
+function renderProfileView() {
+  mainEl.innerHTML = `
+    <div class="main-head">
+      <div class="main-title">Profile</div>
+      <div class="main-tag">Signed in as ${state.access.role === "admin" ? "admin" : "student"}.</div>
+    </div>
+    <div class="overview-tool-row">
+      <div class="overview-tool-card" data-profile-about role="button" tabindex="0">
+        ${iconSvg("bulb", 17)}
+        <span>About this course &amp; ground rules</span>
+      </div>
+      <div class="overview-tool-card" data-profile-lock role="button" tabindex="0">
+        ${iconSvg("lock", 17)}
+        <span>Lock this device</span>
+      </div>
+    </div>
+    <p class="main-tag" style="margin-top:28px;">Progress is saved in this browser. This is education, not diagnosis or individualized medical treatment.</p>
   `;
 }
 
@@ -2507,6 +2606,9 @@ function renderOverviewView() {
 ======================================================================= */
 function renderMain() {
   if (activeTool === "overview") return renderOverviewView();
+  if (activeTool === "tracks") return renderTracksListView();
+  if (activeTool === "tools") return renderToolsListView();
+  if (activeTool === "profile") return renderProfileView();
   if (activeTool === "progress") return renderProgressView();
   if (activeTool === "streaks") return renderStreaksView();
   if (activeTool === "photos") return renderPhotosView();
@@ -3391,7 +3493,7 @@ function showCelebration() {
 }
 function closeCelebration() { celebrationOpen = false; celebrationBackdropEl.classList.remove("open"); updateBodyScrollLock(); }
 
-function renderAll() { renderSidebar(); renderMain(); renderModal(); }
+function renderAll() { renderSidebar(); renderBottomTabs(); renderMain(); renderModal(); }
 
 /* =======================================================================
    EVENTS
@@ -3418,12 +3520,21 @@ homeNavEl.addEventListener("click", (e) => {
   activeTool = item.dataset.tool; renderAll(); mainEl.scrollTop = 0;
 });
 document.getElementById("aboutLink").addEventListener("click", () => { aboutOpen = true; renderModal(); });
-document.getElementById("lockLink").addEventListener("click", () => {
+function lockDevice() {
   state.access = { unlocked: false, role: null };
   saveState();
   fetch("/logout", { method: "POST" }).finally(() => {
     location.href = "/login.html";
   });
+}
+document.getElementById("lockLink").addEventListener("click", lockDevice);
+
+bottomTabsEl.addEventListener("click", (e) => {
+  const tabBtn = e.target.closest("[data-tab]");
+  if (!tabBtn) return;
+  const tab = tabBtn.dataset.tab;
+  activeTool = tab === "home" ? "overview" : tab;
+  renderAll(); mainEl.scrollTop = 0;
 });
 
 mainEl.addEventListener("click", (e) => {
@@ -3432,6 +3543,9 @@ mainEl.addEventListener("click", (e) => {
 
   const overviewTool = e.target.closest("[data-overview-tool]");
   if (overviewTool) { activeTool = overviewTool.dataset.overviewTool; renderAll(); mainEl.scrollTop = 0; return; }
+
+  if (e.target.closest("[data-profile-about]")) { aboutOpen = true; renderModal(); return; }
+  if (e.target.closest("[data-profile-lock]")) { lockDevice(); return; }
 
   const back = e.target.closest("#backToLevels");
   if (back) { state.nav.levelIndex = null; saveState(); renderAll(); mainEl.scrollTop = 0; return; }
