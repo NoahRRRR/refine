@@ -2141,17 +2141,52 @@ function loadContentOverride() {
     if (parsed.quizzes) QUIZZES = parsed.quizzes;
   } catch (e) {}
 }
+let contentSyncTimer = null;
+function syncContentToServer() {
+  clearTimeout(contentSyncTimer);
+  contentSyncTimer = setTimeout(() => {
+    fetch("/content", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ course: COURSE, quizzes: QUIZZES }),
+    }).then((res) => {
+      if (!res.ok) throw new Error("save failed");
+    }).catch(() => {
+      showToast("Saved on this device only — server sync failed. Check your connection.", "warn");
+    });
+  }, 600);
+}
 function saveContentOverride() {
   try {
     localStorage.setItem(CONTENT_STORAGE_KEY, JSON.stringify({ course: COURSE, quizzes: QUIZZES, savedAt: new Date().toISOString() }));
   } catch (e) {}
+  if (state.access.role === "admin") syncContentToServer();
 }
 function resetContentToDefaults() {
   COURSE = JSON.parse(JSON.stringify(DEFAULT_COURSE));
   QUIZZES = JSON.parse(JSON.stringify(DEFAULT_QUIZZES));
   try { localStorage.removeItem(CONTENT_STORAGE_KEY); } catch (e) {}
+  syncContentToServer();
 }
 loadContentOverride();
+
+// Server content (shared across every admin's device) wins over this
+// device's local cache whenever it's reachable; the local cache above
+// is just what renders instantly before this fetch resolves, and what
+// the app falls back to if the device is offline.
+async function loadContentFromServer() {
+  try {
+    const res = await fetch("/content");
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.content && data.content.course) {
+      COURSE = data.content.course;
+      QUIZZES = data.content.quizzes;
+      try { localStorage.setItem(CONTENT_STORAGE_KEY, JSON.stringify(data.content)); } catch (e) {}
+      renderAll();
+    }
+  } catch (e) {}
+}
 
 /* =======================================================================
    STATE — persisted to localStorage so daily check-ins, weekly reviews,
@@ -2616,6 +2651,7 @@ function renderMain() {
   if (activeTool === "editor" && state.access.role === "admin") return renderEditorView();
 
   const cat = COURSE.find(c => c.id === state.nav.catId);
+  if (!cat) { activeTool = "overview"; return renderOverviewView(); }
   if (cat.id === "sober" && !state.sober.screenDone) return renderSoberEntryScreen(cat);
   if (state.nav.levelIndex === null) return renderLevelTiles(cat);
   return renderLessonTiles(cat, state.nav.levelIndex);
@@ -3983,6 +4019,7 @@ function unlockApp(role) {
   document.getElementById("appRoot").style.display = "";
   renderAll();
   loadPhotos();
+  loadContentFromServer();
 }
 
 fetch("/whoami")
