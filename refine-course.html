@@ -2571,7 +2571,8 @@ function renderTracksListView() {
 }
 
 function renderToolsListView() {
-  const visibleTools = state.access.role === "admin" ? TOOLS.concat(ADMIN_TOOLS) : TOOLS;
+  const base = TOOLS.filter(t => t.id !== "progress");
+  const visibleTools = state.access.role === "admin" ? base.concat(ADMIN_TOOLS) : base;
   mainEl.innerHTML = `
     <div class="main-head">
       <div class="main-title">Tools</div>
