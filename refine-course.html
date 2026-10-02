@@ -3415,8 +3415,7 @@ function hasUnsavedEditorChanges() {
   return JSON.stringify(lesson) !== JSON.stringify(original) || JSON.stringify(quiz) !== JSON.stringify(originalQuiz);
 }
 
-function saveEditorLesson() {
-  const { catIdx, lvlIdx, lessonIdx, lesson, quiz } = editorLessonDraft;
+function cleanLessonForSave(lesson) {
   ["outcome", "todayAction", "completionRule", "reflectionPrompt", "safetyNotice", "videoId"].forEach(k => { if (!lesson[k] || !lesson[k].trim()) delete lesson[k]; });
   if (lesson.estimatedMinutes === "" || lesson.estimatedMinutes == null || isNaN(Number(lesson.estimatedMinutes))) delete lesson.estimatedMinutes;
   else lesson.estimatedMinutes = Number(lesson.estimatedMinutes);
@@ -3427,17 +3426,41 @@ function saveEditorLesson() {
   const hp = {};
   Object.keys(lesson.habitProtocol || {}).forEach(k => { if (lesson.habitProtocol[k] && lesson.habitProtocol[k].trim()) hp[k] = lesson.habitProtocol[k].trim(); });
   if (Object.keys(hp).length) lesson.habitProtocol = hp; else delete lesson.habitProtocol;
+  return lesson;
+}
 
+function commitEditorLessonDraft() {
+  const { catIdx, lvlIdx, lessonIdx, lesson, quiz } = editorLessonDraft;
+  cleanLessonForSave(lesson);
   COURSE[catIdx].levels[lvlIdx].lessons[lessonIdx] = lesson;
   const cleanQuiz = quiz.filter(q => q.q && q.q.trim());
   if (cleanQuiz.length) QUIZZES[lesson.id] = cleanQuiz; else delete QUIZZES[lesson.id];
-
+  // Keep the draft in sync with what was just committed (trimmed strings,
+  // deleted empty keys) so the next unsaved-changes check compares like
+  // with like instead of re-triggering on cosmetic cleanup alone.
+  editorLessonDraft.lesson = lesson;
+  editorLessonDraft.quiz = quiz;
   saveContentOverride();
+}
+
+function saveEditorLesson() {
+  commitEditorLessonDraft();
   editorLessonDraft = null;
   editorPath.lessonIdx = null;
   renderAll();
   showToast("Lesson saved.");
 }
+
+// Checkpoints the lesson being edited every few minutes so a crash, a
+// closed tab, or an accidental navigation away can't lose in-progress
+// writing — without interrupting the edit by closing the lesson or
+// re-rendering the form underneath the admin's cursor.
+const AUTOSAVE_INTERVAL_MS = 5 * 60 * 1000;
+setInterval(() => {
+  if (!editorLessonDraft || !hasUnsavedEditorChanges()) return;
+  commitEditorLessonDraft();
+  showToast("Autosaved.");
+}, AUTOSAVE_INTERVAL_MS);
 function journeyBodyHtml() {
   const day = daysSinceStart();
   const phase = PROGRESSION_PHASES.find(p => day >= p.min && day <= p.max) || PROGRESSION_PHASES[PROGRESSION_PHASES.length - 1];
